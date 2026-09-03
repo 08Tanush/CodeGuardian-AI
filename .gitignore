@@ -1,0 +1,28 @@
+# --- Backend (Python) ---
+backend/.env
+backend/**/__pycache__/
+backend/__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+
+# --- Frontend (Node/Vite) ---
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/*.log
+
+# --- OS / editor cruft ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# --- Logs ---
+*.log
+
+# Note: uploaded/cloned repos, generated reports, and session data are
+# stored in the OS temp directory at runtime (see backend/routes.py
+# DATA_DIR), not inside this repo - nothing to ignore here for them.

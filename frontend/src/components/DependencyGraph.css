@@ -1,0 +1,83 @@
+.dependency-graph {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.graph-svg {
+  width: 100%;
+  height: auto;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(59, 130, 246, 0.06), transparent 60%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.graph-node {
+  cursor: pointer;
+}
+
+.graph-node-label {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  pointer-events: none;
+  transition: fill 0.2s ease;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 0 4px;
+}
+
+.graph-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.graph-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.graph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 50px 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.graph-empty-icon {
+  font-size: 1.8rem;
+}
+
+.graph-truncation-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-soft);
+  color: var(--warning);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.graph-truncation-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}

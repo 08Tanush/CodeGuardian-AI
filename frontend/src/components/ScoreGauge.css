@@ -1,0 +1,54 @@
+.score-gauge {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.score-gauge svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.score-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 12;
+}
+
+.score-progress {
+  fill: none;
+  stroke-width: 12;
+  stroke-linecap: round;
+}
+
+.score-gauge-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-display);
+}
+
+.score-gauge-value strong {
+  font-size: 2.6rem;
+  font-weight: 700;
+}
+
+.score-gauge-value span {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.score-gauge-label {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}

@@ -1,0 +1,59 @@
+.feature-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px 26px;
+  transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease), background 0.25s var(--ease);
+}
+
+.feature-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: var(--shadow-glow);
+  background: var(--card-hover);
+}
+
+.feature-card-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 18px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.accent-secondary .feature-card-icon {
+  background: var(--secondary-soft);
+  color: var(--secondary);
+}
+
+.accent-success .feature-card-icon {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.accent-warning .feature-card-icon {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.accent-danger .feature-card-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.feature-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.08rem;
+  margin-bottom: 10px;
+  letter-spacing: -0.01em;
+}
+
+.feature-card p {
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
