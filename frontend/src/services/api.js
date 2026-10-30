@@ -71,3 +71,7 @@ export async function explainFile(id, path) {
 export function reportDownloadUrl(id) {
   return `${API_BASE}/report/${id}/download`;
 }
+
+export function reportPdfDownloadUrl(id) {
+  return `${API_BASE}/report/${id}/download/pdf`;
+}

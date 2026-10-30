@@ -62,6 +62,13 @@ _BROAD_EXCEPT_RE = re.compile(r"^[ \t]*except\s+Exception\s*:[ \t]*$", re.MULTIL
 _PY_DEF_RE = re.compile(r"^[ \t]*def\s+\w+\s*\(", re.MULTILINE)
 _PY_DOCSTRING_DEF_RE = re.compile(r'def\s+\w+\s*\([^)]*\)\s*:\s*\n\s*("""|\'\'\')')
 
+_TEST_PATH_RE = re.compile(
+    r"(^|/)(tests?|__tests__|spec|specs)/"            # test folders
+    r"|(^|/)test_[^/]+$|_test\.[a-z]+$"               # test_x.py, x_test.go
+    r"|\.(test|spec)\.[a-z]+$"                        # x.test.js, x.spec.ts
+    r"|(^|/)[^/]*tests?\.(java|kt|cs|php|swift)$"     # FooTest.java, FooTests.cs
+)
+
 LONG_FILE_LINES = 400
 LONG_FUNCTION_LINES = 80
 DEEP_NESTING_LEVEL = 6
@@ -161,7 +168,9 @@ def analyze_repository_files(files_with_content: list[tuple[str, str]]) -> tuple
         issues.extend(analyze_file(path, content))
 
     has_readme = any(p.lower().startswith("readme") for p, _ in files_with_content)
-    has_tests = any("test" in p.lower() for p, _ in files_with_content)
+    # Match test folders/files by name, not any path containing "test"
+    # (which flagged latest.js, contest/, attestation.py as tests).
+    has_tests = any(_TEST_PATH_RE.search(p.lower()) for p, _ in files_with_content)
 
     if has_readme:
         strengths.append("Repository includes a README for onboarding.")

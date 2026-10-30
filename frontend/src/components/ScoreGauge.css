@@ -1,54 +1,72 @@
 .score-gauge {
   position: relative;
-  width: 180px;
-  height: 180px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto;
+  aspect-ratio: 1 / 0.92;
+  display: grid;
 }
 
 .score-gauge svg {
-  position: absolute;
-  inset: 0;
-  transform: rotate(-90deg);
   width: 100%;
-  height: 100%;
+  height: auto;
 }
 
-.score-track {
+.score-gauge circle {
   fill: none;
-  stroke: var(--border);
-  stroke-width: 12;
-}
-
-.score-progress {
-  fill: none;
-  stroke-width: 12;
+  stroke-width: 9;
   stroke-linecap: round;
 }
 
-.score-gauge-value {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-family: var(--font-display);
+.score-track {
+  stroke: var(--surface-3);
 }
 
-.score-gauge-value strong {
+.tone-good .score-fill {
+  stroke: var(--accent);
+}
+.tone-warn .score-fill {
+  stroke: var(--sev-medium);
+}
+.tone-bad .score-fill {
+  stroke: var(--sev-high);
+}
+
+.score-gauge-center {
+  position: absolute;
+  inset: 0 0 18% 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.score-gauge-center strong {
+  font-family: var(--font-mono);
   font-size: 2.6rem;
-  font-weight: 700;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
 }
 
-.score-gauge-value span {
-  font-size: 0.95rem;
-  color: var(--text-muted);
+.score-gauge-center span {
+  color: var(--text-3);
+  font-size: 0.78rem;
+  margin-top: 4px;
 }
 
-.score-gauge-label {
-  margin-top: 6px;
+.score-gauge-verdict {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2%;
+  text-align: center;
   font-size: 0.85rem;
-  color: var(--text-secondary);
-  font-weight: 600;
+  font-weight: 500;
+}
+
+.tone-good .score-gauge-verdict {
+  color: var(--accent-text);
+}
+.tone-warn .score-gauge-verdict {
+  color: var(--sev-medium);
+}
+.tone-bad .score-gauge-verdict {
+  color: var(--sev-high);
 }

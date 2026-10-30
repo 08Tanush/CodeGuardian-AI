@@ -14,7 +14,7 @@ and a maintainability score — plus a per-file AI explainer.
 
 ## Screenshots
 
-> A look at CodeGuardian AI in action — from repository analysis to interactive architecture visualization and file-level explanations.
+> Landing page, dashboard, dependency map, and file explainer (dark theme; a light theme follows your system setting or the toggle in the nav).
 
 > [Adding your own screenshots](#adding-your-own-screenshots) below.
 
@@ -58,7 +58,9 @@ and a maintainability score — plus a per-file AI explainer.
   works](#how-analysis-works))
 - **Per-file AI explainer** - click any file in the repo tree to get its
   purpose, logic, flow, and improvement suggestions
-- **Downloadable Markdown report** for sharing outside the app
+- **Downloadable PDF and Markdown reports** for sharing outside the app
+- **Filterable findings** by category and severity, each linking to its file's explanation
+- **Light and dark themes**, keyboard-accessible charts and graph, responsive down to phone width
 - **Works without an API key** - falls back to a complete heuristic-only
   report if Groq isn't configured or is temporarily rate-limited
 

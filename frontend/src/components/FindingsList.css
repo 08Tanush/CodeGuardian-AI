@@ -1,0 +1,112 @@
+.findings {
+  display: grid;
+  gap: 16px;
+}
+
+.findings-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+.filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 0.84rem;
+  color: var(--text-2);
+  transition: border-color 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+
+.filter-chip .mono {
+  color: var(--text-3);
+  font-size: 0.76rem;
+}
+
+.filter-chip:hover {
+  border-color: var(--line-strong);
+}
+
+.filter-chip.active {
+  border-color: var(--text);
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.findings-list {
+  border-top: 1px solid var(--line);
+}
+
+.finding {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.finding .sev-tag {
+  width: 84px;
+  margin-top: 1px;
+}
+
+.finding-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.finding-desc {
+  font-size: 0.92rem;
+}
+
+.finding-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 3px;
+  font-size: 0.8rem;
+  color: var(--text-3);
+}
+
+.finding-file {
+  color: var(--text-3);
+  overflow-wrap: anywhere;
+  text-align: left;
+  font-size: 0.78rem;
+}
+
+button.finding-file {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-text) 35%, transparent);
+  text-underline-offset: 3px;
+}
+
+button.finding-file:hover {
+  text-decoration-color: currentColor;
+}
+
+.findings-more {
+  justify-self: start;
+}
+
+@media (max-width: 560px) {
+  .finding {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .finding .sev-tag {
+    width: auto;
+  }
+}

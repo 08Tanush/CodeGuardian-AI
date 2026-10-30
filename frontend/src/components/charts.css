@@ -1,0 +1,149 @@
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Legend */
+.chart-legend {
+  display: flex;
+  gap: 6px 16px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+
+.chart-legend-wrap {
+  flex-wrap: wrap;
+}
+
+.chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-value {
+  color: var(--text-3);
+}
+
+.fill-high {
+  background: var(--sev-high);
+}
+.fill-medium {
+  background: var(--sev-medium);
+}
+.fill-low {
+  background: var(--sev-low);
+}
+
+/* Stacked bar: 2px surface gaps between segments, rounded data ends. */
+.stack {
+  display: flex;
+  gap: 2px;
+  height: 12px;
+  min-width: 6px;
+  transform-origin: left center;
+}
+
+.stack-tall {
+  height: 14px;
+}
+
+.stack-seg {
+  position: relative;
+  min-width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  outline-offset: 2px;
+}
+
+.stack-seg:first-child {
+  border-radius: 4px 2px 2px 4px;
+}
+.stack-seg:last-child {
+  border-radius: 2px 4px 4px 2px;
+}
+.stack-seg:only-child {
+  border-radius: 4px;
+}
+
+/* Hover/focus tooltip for chart marks. */
+.stack-seg[data-tip]:hover::after,
+.stack-seg[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Severity breakdown table */
+.breakdown {
+  display: grid;
+  gap: 16px;
+}
+
+.breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.breakdown-table td,
+.breakdown-table th {
+  padding: 8px 0;
+}
+
+.breakdown-label {
+  text-align: left;
+  font-weight: 400;
+  font-size: 0.88rem;
+  color: var(--text-2);
+  width: 120px;
+  padding-right: 12px !important;
+  white-space: nowrap;
+}
+
+.breakdown-bar-cell {
+  width: 100%;
+}
+
+.breakdown-count {
+  text-align: right;
+  padding-left: 12px !important;
+  font-size: 0.88rem;
+  min-width: 36px;
+}
+
+.langbar {
+  display: grid;
+  gap: 12px;
+}
+
+/* Keep edge tooltips inside the chart. */
+.stack-seg[data-tip]:first-child::after {
+  left: 0;
+  transform: none;
+}
+.stack-seg[data-tip]:last-child:not(:first-child)::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}

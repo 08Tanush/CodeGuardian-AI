@@ -1,67 +1,68 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  HiOutlineCloudArrowUp,
-  HiOutlineDocumentArrowUp,
-  HiOutlineLink,
-  HiOutlineExclamationTriangle,
-  HiArrowRight,
-  HiXMark,
-} from "react-icons/hi2";
+import { PiFileZip, PiGithubLogo, PiUploadSimple, PiX, PiWarningCircle, PiArrowRight } from "react-icons/pi";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useAnalysisContext } from "../context/AnalysisContext";
 import usePageTitle from "../hooks/usePageTitle";
+import useRobotsMeta from "../hooks/useRobotsMeta";
 import "./Upload.css";
 
 const MAX_ZIP_MB = 50;
+const GITHUB_RE = /^(https?:\/\/)?(www\.)?github\.com\/[\w.-]+\/[\w.-]+([/?#].*)?$|^git@github\.com:[\w.-]+\/[\w.-]+(\.git)?$/i;
+
+function formatSize(bytes) {
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(0)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function Upload() {
-  usePageTitle("Analyze Repository");
+  usePageTitle("Analyze a repository");
+  useRobotsMeta(false);
   const navigate = useNavigate();
   const { setPendingRequest } = useAnalysisContext();
+  const urlId = useId();
+  const errorId = useId();
 
-  const [mode, setMode] = useState("zip"); // 'zip' | 'github'
+  const [mode, setMode] = useState("zip");
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef(null);
 
-  const validateAndSetFile = useCallback((candidate) => {
+  const pickFile = useCallback((candidate) => {
     setError("");
     if (!candidate) return;
     if (!candidate.name.toLowerCase().endsWith(".zip")) {
-      setError("Please choose a .zip file.");
+      setError("That isn't a .zip file. Compress the project folder first, then upload the archive.");
       return;
     }
     if (candidate.size > MAX_ZIP_MB * 1024 * 1024) {
-      setError(`That file is larger than the ${MAX_ZIP_MB}MB limit for this demo.`);
+      setError(`That file is ${formatSize(candidate.size)}. The limit is ${MAX_ZIP_MB} MB; try excluding node_modules or build output.`);
       return;
     }
     setFile(candidate);
   }, []);
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const dropped = e.dataTransfer.files?.[0];
-    validateAndSetFile(dropped);
+  const switchMode = (next) => {
+    setMode(next);
+    setError("");
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (e) => {
+    e.preventDefault();
     setError("");
     if (mode === "zip") {
       if (!file) {
-        setError("Choose a ZIP file to analyze first.");
+        setError("Choose a .zip file to analyze.");
         return;
       }
       setPendingRequest({ mode: "zip", file });
     } else {
       const trimmed = url.trim();
-      if (!trimmed || !trimmed.includes("github.com")) {
-        setError("Enter a valid public GitHub repository URL.");
+      if (!GITHUB_RE.test(trimmed)) {
+        setError("Enter a repository URL like https://github.com/owner/repo.");
         return;
       }
       setPendingRequest({ mode: "github", url: trimmed });
@@ -69,105 +70,150 @@ export default function Upload() {
     navigate("/analyzing");
   };
 
+  const openPicker = () => inputRef.current?.click();
+
   return (
     <>
       <Navbar />
-      <main className="page upload-page">
-        <div className="container upload-container">
+      <main id="main" className="page upload-page">
+        <div className="container upload-layout">
           <motion.div
-            className="upload-heading"
-            initial={{ opacity: 0, y: 16 }}
+            className="upload-intro"
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            <span className="section-eyebrow">Start an analysis</span>
-            <h1>Bring in a repository</h1>
-            <p>Upload a ZIP archive of your project, or point CodeGuardian at a public GitHub URL.</p>
+            <h1>Analyze a repository</h1>
+            <p>Upload a ZIP of your project or paste a public GitHub URL. Most repositories finish in under a minute.</p>
+            <ul className="upload-facts">
+              <li>Dependencies, build output, and .git are skipped automatically.</li>
+              <li>Results stay available at their own link, so you can share the dashboard.</li>
+              <li>Private GitHub repositories aren't supported; upload them as a ZIP.</li>
+            </ul>
           </motion.div>
 
-          <motion.div
-            className="upload-card"
-            initial={{ opacity: 0, y: 20 }}
+          <motion.form
+            className="upload-card panel"
+            onSubmit={handleSubmit}
+            noValidate
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.08 }}
+            transition={{ duration: 0.5, delay: 0.06, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="upload-tabs">
+            <div className="segmented" role="tablist" aria-label="Source">
               <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "zip"}
                 className={mode === "zip" ? "active" : ""}
-                onClick={() => { setMode("zip"); setError(""); }}
+                onClick={() => switchMode("zip")}
               >
-                <HiOutlineDocumentArrowUp /> Upload ZIP
+                <PiFileZip /> ZIP file
               </button>
               <button
+                type="button"
+                role="tab"
+                aria-selected={mode === "github"}
                 className={mode === "github" ? "active" : ""}
-                onClick={() => { setMode("github"); setError(""); }}
+                onClick={() => switchMode("github")}
               >
-                <HiOutlineLink /> GitHub URL
+                <PiGithubLogo /> GitHub URL
               </button>
             </div>
 
             {mode === "zip" ? (
-              <div
-                className={`dropzone ${isDragging ? "dragging" : ""} ${file ? "has-file" : ""}`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => inputRef.current?.click()}
-                role="button"
-                tabIndex={0}
-              >
+              <div className="field">
+                <span className="field-label">Project archive</span>
                 <input
+                  key="zip-input"
                   ref={inputRef}
                   type="file"
-                  accept=".zip"
+                  accept=".zip,application/zip"
                   hidden
-                  onChange={(e) => validateAndSetFile(e.target.files?.[0])}
+                  onChange={(e) => {
+                    pickFile(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
                 />
                 {file ? (
-                  <div className="dropzone-file">
-                    <HiOutlineDocumentArrowUp className="dropzone-file-icon" />
-                    <div>
-                      <p className="dropzone-file-name">{file.name}</p>
-                      <p className="dropzone-file-size">{(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+                  <div className="file-chip">
+                    <PiFileZip className="file-chip-icon" />
+                    <div className="file-chip-text">
+                      <p className="mono">{file.name}</p>
+                      <p className="field-help">{formatSize(file.size)}</p>
                     </div>
-                    <button
-                      className="dropzone-clear"
-                      onClick={(e) => { e.stopPropagation(); setFile(null); }}
-                      aria-label="Remove file"
-                    >
-                      <HiXMark />
+                    <button type="button" className="btn btn-quiet" onClick={() => setFile(null)} aria-label="Remove file">
+                      <PiX />
                     </button>
                   </div>
                 ) : (
-                  <>
-                    <HiOutlineCloudArrowUp className="dropzone-icon" />
-                    <p className="dropzone-title">Drag &amp; drop your ZIP here</p>
-                    <p className="dropzone-subtitle">or click to browse — up to {MAX_ZIP_MB}MB</p>
-                  </>
+                  <div
+                    className={`dropzone ${isDragging ? "dragging" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      pickFile(e.dataTransfer.files?.[0]);
+                    }}
+                    onClick={openPicker}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openPicker();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-describedby={error ? errorId : undefined}
+                  >
+                    <PiUploadSimple className="dropzone-icon" />
+                    <p className="dropzone-title">Drop a .zip here, or click to choose</p>
+                    <p className="field-help">Up to {MAX_ZIP_MB} MB</p>
+                  </div>
                 )}
               </div>
             ) : (
-              <div className="url-field">
-                <HiOutlineLink className="url-field-icon" />
+              <div className="field">
+                <label className="field-label" htmlFor={urlId}>
+                  Repository URL
+                </label>
                 <input
-                  type="text"
-                  placeholder="https://github.com/user/repository"
+                  key="url-input"
+                  id={urlId}
+                  className="text-input mono"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="https://github.com/owner/repo"
                   value={url}
-                  onChange={(e) => { setUrl(e.target.value); setError(""); }}
+                  onChange={(e) => {
+                    setUrl(e.target.value);
+                    setError("");
+                  }}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? errorId : `${urlId}-help`}
                 />
+                <p className="field-help" id={`${urlId}-help`}>
+                  Public repositories only. The default branch is analyzed.
+                </p>
               </div>
             )}
 
             {error && (
-              <div className="upload-error">
-                <HiOutlineExclamationTriangle /> {error}
-              </div>
+              <p className="field-error" id={errorId} role="alert">
+                <PiWarningCircle /> {error}
+              </p>
             )}
 
-            <button className="btn btn-primary upload-submit" onClick={handleSubmit}>
-              Analyze repository <HiArrowRight />
+            <button type="submit" className="btn btn-primary btn-lg upload-submit">
+              Start analysis <PiArrowRight />
             </button>
-          </motion.div>
+          </motion.form>
         </div>
       </main>
       <Footer />

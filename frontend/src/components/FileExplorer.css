@@ -1,76 +1,100 @@
+@import "./charts.css";
+
 .file-explorer {
-  max-height: 520px;
-  overflow-y: auto;
-  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 
-.file-explorer::-webkit-scrollbar {
-  width: 8px;
-}
-
-.file-explorer::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-.file-node-row {
-  width: 100%;
+.tree-search {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.85rem;
-  color: var(--text-secondary);
+  margin: 10px;
+  padding: 0 10px;
+  height: 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-3);
+}
+
+.tree-search:focus-within {
+  border-color: var(--accent);
+}
+
+.tree-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.tree-search input::placeholder {
+  color: var(--text-3);
+}
+
+.tree {
+  overflow-y: auto;
+  padding: 0 6px 10px;
+  flex: 1;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 30px;
+  padding-right: 8px;
+  border-radius: 6px;
+  font-size: 0.86rem;
+  color: var(--text-2);
   text-align: left;
-  transition: background 0.15s var(--ease), color 0.15s var(--ease);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.file-node-row:hover {
-  background: rgba(255, 255, 255, 0.05);
+.tree-row:hover {
+  background: var(--surface-2);
   color: var(--text);
 }
 
-.file-row.active {
-  background: var(--primary-soft);
-  color: var(--text);
-  font-weight: 600;
+.tree-file.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 500;
 }
 
-.file-node-icon {
+.tree-caret {
+  font-size: 0.75rem;
   flex-shrink: 0;
-  font-size: 1rem;
+  transition: transform 0.15s var(--ease);
 }
 
-.file-node-icon.folder {
-  color: var(--secondary);
-}
-
-.file-node-icon.file {
-  color: var(--text-muted);
-}
-
-.file-row.active .file-node-icon.file {
-  color: var(--primary);
-}
-
-.file-node-chevron {
-  flex-shrink: 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  transition: transform 0.2s var(--ease);
-}
-
-.file-node-chevron.open {
+.tree-caret.open {
   transform: rotate(90deg);
 }
 
-.file-explorer-empty {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 0.88rem;
+.tree-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  color: var(--text-3);
+}
+
+.tree-file.active .tree-icon {
+  color: inherit;
+}
+
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-empty {
+  padding: 12px;
 }

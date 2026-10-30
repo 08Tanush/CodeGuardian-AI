@@ -15,7 +15,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from services import github as github_service
@@ -69,6 +69,9 @@ def _enforce_rate_limit(request: Request) -> None:
         )
     hits.append(now)
     _rate_limit_hits[client_ip] = hits
+    # Drop clients whose window has fully expired so the dict can't grow forever.
+    for ip in [ip for ip, ts in _rate_limit_hits.items() if now - ts[-1] >= RATE_LIMIT_WINDOW_SECONDS]:
+        del _rate_limit_hits[ip]
 
 
 class GithubUrlRequest(BaseModel):
@@ -266,19 +269,55 @@ def explain_file_endpoint(payload: FileExplainRequest):
         explanation["source"] = "ai"
         return explanation
     except GroqUnavailableError:
-        return _heuristic_file_explanation(payload.path, content)
+        file_issues = [i for i in session["analysis"].get("issues", []) if i.get("file") == payload.path]
+        return _heuristic_file_explanation(payload.path, content, file_issues)
 
 
-def _heuristic_file_explanation(path: str, content: str) -> dict:
-    """Fallback explanation used when Groq isn't configured/reachable."""
+_SYMBOL_RE = re.compile(
+    r"^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?"
+    r"(?:def|class|function|interface|struct|fn|func)\s+([A-Za-z_]\w*)"
+    r"|^\s*(?:export\s+)?const\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>",
+    re.MULTILINE,
+)
+_IMPORT_RE = re.compile(
+    r"""^\s*(?:from\s+([.\w]+)\s+import"""                       # python: from x import y
+    r"""|import\s.*?from\s+['"]([^'"]+)['"]"""                    # js: import x from 'y'
+    r"""|import\s+([.\w]+(?:\s*,\s*[.\w]+)*)\s*$"""              # python: import a, b
+    r"""|.*?require\(\s*['"]([^'"]+)['"]\s*\))""",                # js: require('y')
+    re.MULTILINE,
+)
+
+
+def _heuristic_file_explanation(path: str, content: str, file_issues: list[dict]) -> dict:
+    """
+    Fallback explanation used when Groq isn't configured/reachable. Built
+    from what static parsing can honestly say about the file: its defined
+    symbols, its imports, its size, and the findings already recorded for it.
+    """
     lines = count_lines(content)
-    functions = len(re.findall(r"^\s*(def |function |const \w+\s*=\s*\(|export function)", content, re.MULTILINE))
+    symbols = list(dict.fromkeys(a or b for a, b in _SYMBOL_RE.findall(content)))
+    imports = list(dict.fromkeys(
+        name.strip() for m in _IMPORT_RE.findall(content) for name in next(g for g in m if g).split(",")
+    ))
     complexity = "Low" if lines < 80 else "Medium" if lines < 250 else "High"
+
+    def _list(items: list[str], limit: int) -> str:
+        shown = ", ".join(items[:limit])
+        return shown + (f" and {len(items) - limit} more" if len(items) > limit else "")
+
+    purpose = f"{Path(path).name} is a {lines}-line file"
+    purpose += f" that defines {_list(symbols, 6)}." if symbols else " with no top-level functions or classes detected."
+    logic = (f"Imports {_list(imports, 6)}." if imports else "Has no imports, so it doesn't depend on other modules.")
+    flow = ("Static parsing can't trace control flow. Read the definitions above in order, "
+            "starting from whichever one other files import.")
+    improvements = [f"{i['description'].rstrip('.')} ({i['severity']} severity)." for i in file_issues] or [
+        "No static analysis findings for this file."
+    ]
     return {
-        "purpose": f"'{path}' is part of the repository (heuristic explanation - AI analysis not configured).",
-        "logic": f"Contains roughly {functions} function/method definition(s) across {lines} lines.",
-        "flow": "Enable AI analysis (set GROQ_API_KEY) for a detailed control-flow explanation.",
-        "improvements": ["Enable AI analysis for tailored improvement suggestions."],
+        "purpose": purpose,
+        "logic": logic,
+        "flow": flow,
+        "improvements": improvements,
         "complexity": complexity,
         "source": "heuristic",
     }
@@ -293,5 +332,29 @@ def download_report(session_id: str):
     return PlainTextResponse(
         content=markdown,
         media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/report/{session_id}/download/pdf")
+def download_report_pdf(session_id: str):
+    session = _get_session_or_404(session_id)
+    try:
+        from services.pdf_generator import build_pdf_report
+        pdf_bytes = build_pdf_report(session["analysis"])
+    except ImportError as exc:
+        logger.exception("PDF generation unavailable: %s", exc)
+        raise HTTPException(
+            status_code=503,
+            detail="PDF generation isn't available on this server right now.",
+        ) from exc
+    except Exception as exc:
+        logger.exception("PDF generation failed for session %s: %s", session_id, exc)
+        raise HTTPException(status_code=500, detail="Couldn't generate the PDF report. Please try again.") from exc
+
+    filename = safe_filename(f"{session['name']}-codeguardian-report.pdf")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

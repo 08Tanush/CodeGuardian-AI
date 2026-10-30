@@ -1,143 +1,133 @@
-.loading-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: var(--gradient-radial), var(--bg);
+.loading-wrap {
+  display: grid;
+  place-items: center;
+  min-height: calc(100dvh - var(--header-height));
+  padding-top: 24px;
+  padding-bottom: 48px;
 }
 
 .loading-card {
   width: 100%;
-  max-width: 420px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 44px 38px;
-  text-align: center;
-  box-shadow: var(--shadow-card);
+  max-width: 520px;
+  padding: 28px;
 }
 
-.loading-ring {
-  position: relative;
-  width: 130px;
-  height: 130px;
-  margin: 0 auto 26px;
+.loading-card h1 {
+  font-size: 1.5rem;
 }
 
-.loading-ring svg {
-  width: 100%;
-  height: 100%;
-  transform: rotate(-90deg);
+.loading-source {
+  margin-top: 6px;
+  color: var(--text-3);
+  overflow-wrap: anywhere;
 }
 
-.ring-track {
-  fill: none;
-  stroke: var(--border);
-  stroke-width: 8;
+.loading-stages {
+  margin-top: 24px;
+  display: grid;
+  gap: 4px;
 }
 
-.ring-progress {
-  fill: none;
-  stroke: url(#none);
-  stroke: var(--primary);
-  stroke-width: 8;
-  stroke-linecap: round;
-}
-
-.loading-ring-value {
-  position: absolute;
-  inset: 0;
+.stage {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-display);
-  font-size: 1.4rem;
-  font-weight: 700;
-}
-
-.loading-card h2 {
-  font-family: var(--font-display);
-  font-size: 1.35rem;
-  margin-bottom: 8px;
-  letter-spacing: -0.01em;
-}
-
-.loading-subtitle {
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  margin-bottom: 28px;
-}
-
-.loading-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  text-align: left;
-}
-
-.loading-steps li {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  font-size: 0.92rem;
-  color: var(--text-muted);
-  transition: color 0.3s var(--ease);
+  padding: 10px 0;
+  color: var(--text-3);
+  font-size: 0.93rem;
 }
 
-.loading-steps li.active {
+.stage.active,
+.stage.done {
   color: var(--text);
-  font-weight: 600;
 }
 
-.loading-steps li.done {
-  color: var(--text-secondary);
-}
-
-.loading-step-marker {
+.stage-marker {
   width: 20px;
   height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-strong);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  color: var(--success);
-  font-size: 1.15rem;
+  font-size: 0.75rem;
 }
 
-.loading-step-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--border);
+.stage.active .stage-marker {
+  border-color: var(--accent);
 }
 
-.loading-steps li.active .loading-step-dot {
-  background: var(--primary);
-  animation: pulse-dot 1s ease-in-out infinite;
+.stage.done .stage-marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 
-@keyframes pulse-dot {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.5); opacity: 0.6; }
+.stage-body {
+  flex: 1;
+  display: grid;
+  gap: 10px;
+}
+
+.stage-bar {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.stage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transform-origin: left;
+  transition: transform 0.25s var(--ease);
+}
+
+.stage-bar.indeterminate span {
+  width: 35%;
+  animation: slide 1.3s var(--ease) infinite;
+}
+
+@keyframes slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.stage-pct {
+  color: var(--text-2);
+}
+
+.loading-time {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 0.84rem;
+  color: var(--text-3);
+}
+
+.loading-error {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
 }
 
 .loading-error-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--danger-soft);
-  color: var(--danger);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.6rem;
-  margin: 0 auto 18px;
+  font-size: 1.8rem;
+  color: var(--sev-high);
 }
 
-.loading-error-message {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  margin-bottom: 24px;
+.loading-error p {
+  color: var(--text-2);
+}
+
+.loading-error-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
 }

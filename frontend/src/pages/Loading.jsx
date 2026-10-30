@@ -1,122 +1,129 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { HiCheckCircle, HiOutlineExclamationTriangle } from "react-icons/hi2";
+import { Link, useNavigate } from "react-router-dom";
+import { PiCheckBold, PiWarningCircle } from "react-icons/pi";
+import Navbar from "../components/Navbar";
 import { useAnalysisContext } from "../context/AnalysisContext";
 import { uploadZip, uploadGithubUrl } from "../services/api";
+import usePageTitle from "../hooks/usePageTitle";
 import "./Loading.css";
 
-const STEPS = [
-  "Reading repository",
-  "Extracting files",
-  "Understanding code",
-  "Running AI analysis",
-  "Building report",
-  "Finalizing dashboard",
-];
+// Stages reflect what is really happening: a ZIP has a measurable upload,
+// then one server request does the analysis; a GitHub URL is a single
+// request (clone + analyze) with no measurable progress.
+function stagesFor(mode) {
+  return mode === "zip"
+    ? ["Uploading archive", "Scanning files and building the report", "Opening dashboard"]
+    : ["Cloning repository and scanning files", "Opening dashboard"];
+}
 
 export default function Loading() {
+  usePageTitle("Analyzing");
   const navigate = useNavigate();
   const { pendingRequest, setSession } = useAnalysisContext();
-  const [activeStep, setActiveStep] = useState(0);
-  const [progress, setProgress] = useState(6);
+  const [stage, setStage] = useState(0);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
   const startedRef = useRef(false);
 
+  // The request must fire exactly once, even under StrictMode's double effect.
   useEffect(() => {
     if (!pendingRequest) {
-      navigate("/upload");
+      navigate("/upload", { replace: true });
       return;
     }
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // Step timer purely for visual feedback - it doesn't gate the real request.
-    const stepInterval = setInterval(() => {
-      setActiveStep((s) => (s < STEPS.length - 1 ? s + 1 : s));
-    }, 1100);
+    const isZip = pendingRequest.mode === "zip";
+    const last = stagesFor(pendingRequest.mode).length - 1;
+    const request = isZip
+      ? uploadZip(pendingRequest.file, (pct) => {
+          setUploadPct(pct);
+          if (pct >= 100) setStage(1);
+        })
+      : uploadGithubUrl(pendingRequest.url);
 
-    const progressInterval = setInterval(() => {
-      setProgress((p) => (p < 90 ? p + Math.random() * 6 : p));
-    }, 350);
-
-    const run = async () => {
-      try {
-        const data =
-          pendingRequest.mode === "zip"
-            ? await uploadZip(pendingRequest.file)
-            : await uploadGithubUrl(pendingRequest.url);
-
-        setActiveStep(STEPS.length - 1);
-        setProgress(100);
+    request
+      .then((data) => {
+        setStage(last);
         setSession({ id: data.id, analysis: data.analysis });
+        navigate(`/dashboard/${data.id}`, { replace: true });
+      })
+      .catch((err) => setError(err.message || "Analysis failed. Please try again."));
+  }, [pendingRequest, navigate, setSession]);
 
-        setTimeout(() => navigate(`/dashboard/${data.id}`), 500);
-      } catch (err) {
-        setError(err.message || "Analysis failed. Please try again.");
-      } finally {
-        clearInterval(stepInterval);
-        clearInterval(progressInterval);
-      }
-    };
+  useEffect(() => {
+    if (error) return undefined;
+    const t = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [error]);
 
-    run();
-
-    return () => {
-      clearInterval(stepInterval);
-      clearInterval(progressInterval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingRequest]);
+  if (!pendingRequest) return null;
+  const stages = stagesFor(pendingRequest.mode);
+  const source = pendingRequest.mode === "zip" ? pendingRequest.file.name : pendingRequest.url;
 
   return (
-    <main className="loading-page">
-      <div className="loading-card">
-        {error ? (
-          <>
-            <div className="loading-error-icon">
-              <HiOutlineExclamationTriangle />
-            </div>
-            <h2>Analysis failed</h2>
-            <p className="loading-error-message">{error}</p>
-            <button className="btn btn-primary" onClick={() => navigate("/upload")}>
-              Try again
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="loading-ring">
-              <svg viewBox="0 0 100 100">
-                <circle className="ring-track" cx="50" cy="50" r="44" />
-                <motion.circle
-                  className="ring-progress"
-                  cx="50"
-                  cy="50"
-                  r="44"
-                  strokeDasharray={276}
-                  animate={{ strokeDashoffset: 276 - (276 * progress) / 100 }}
-                  transition={{ ease: "easeOut", duration: 0.3 }}
-                />
-              </svg>
-              <span className="loading-ring-value">{Math.min(100, Math.round(progress))}%</span>
-            </div>
+    <>
+      <Navbar />
+      <main id="main" className="page loading-page">
+        <div className="container loading-wrap">
+          <div className="loading-card panel" aria-live="polite">
+            {error ? (
+              <div className="loading-error">
+                <PiWarningCircle className="loading-error-icon" />
+                <h1>Analysis failed</h1>
+                <p>{error}</p>
+                <div className="loading-error-actions">
+                  <Link to="/upload" className="btn btn-primary">
+                    Try again
+                  </Link>
+                  <Link to="/" className="btn btn-secondary">
+                    Home
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h1>Analyzing</h1>
+                <p className="loading-source mono">{source}</p>
 
-            <h2>Analyzing your repository</h2>
-            <p className="loading-subtitle">This usually takes under a minute.</p>
+                <ol className="loading-stages">
+                  {stages.map((label, i) => {
+                    const state = i < stage ? "done" : i === stage ? "active" : "todo";
+                    const measurable = pendingRequest.mode === "zip" && i === 0;
+                    return (
+                      <li key={label} className={`stage ${state}`}>
+                        <span className="stage-marker">{state === "done" ? <PiCheckBold /> : null}</span>
+                        <div className="stage-body">
+                          <span>{label}</span>
+                          {state === "active" && (
+                            <div
+                              className={`stage-bar ${measurable ? "" : "indeterminate"}`}
+                              role="progressbar"
+                              aria-label={label}
+                              aria-valuenow={measurable ? uploadPct : undefined}
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                            >
+                              <span style={measurable ? { transform: `scaleX(${uploadPct / 100})` } : undefined} />
+                            </div>
+                          )}
+                        </div>
+                        {state === "active" && measurable && <span className="stage-pct mono">{uploadPct}%</span>}
+                      </li>
+                    );
+                  })}
+                </ol>
 
-            <ul className="loading-steps">
-              {STEPS.map((step, i) => (
-                <li key={step} className={i < activeStep ? "done" : i === activeStep ? "active" : ""}>
-                  <span className="loading-step-marker">
-                    {i < activeStep ? <HiCheckCircle /> : <span className="loading-step-dot" />}
-                  </span>
-                  {step}
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </main>
+                <p className="loading-time">
+                  <span className="mono">{seconds}s</span> elapsed. Large repositories can take a couple of minutes.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </main>
+    </>
   );
 }

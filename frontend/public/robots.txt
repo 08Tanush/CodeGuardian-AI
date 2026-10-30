@@ -1,0 +1,13 @@
+# CodeGuardian AI
+User-agent: *
+Allow: /
+Allow: /upload
+
+# Dashboard and Report pages show a specific user's private analysis
+# results, keyed by a per-upload session id. They aren't meant to be
+# discovered via search, and indexing them would mean exposing whatever
+# repository someone happened to analyze.
+Disallow: /dashboard/
+Disallow: /report/
+
+Sitemap: /sitemap.xml

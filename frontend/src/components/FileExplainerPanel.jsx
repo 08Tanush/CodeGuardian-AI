@@ -1,99 +1,71 @@
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  HiOutlineDocument,
-  HiOutlineLightBulb,
-  HiOutlineCog6Tooth,
-  HiOutlineArrowPath,
-  HiOutlineWrenchScrewdriver,
-  HiOutlineChartBar,
-} from "react-icons/hi2";
+import { PiFileCode, PiCursorClick } from "react-icons/pi";
 import "./FileExplainerPanel.css";
 
-function complexityAccent(level) {
-  if (level === "High") return "danger";
-  if (level === "Medium") return "warning";
-  return "success";
-}
+const COMPLEXITY_CLASS = { High: "sev-high", Medium: "sev-medium", Low: "sev-low" };
 
 export default function FileExplainerPanel({ path, loading, error, explanation }) {
   if (!path) {
     return (
-      <div className="explainer-panel explainer-empty">
-        <HiOutlineDocument className="explainer-empty-icon" />
-        <p>Select a file on the left to get an AI explanation of its purpose, logic, and flow.</p>
+      <div className="explainer explainer-empty">
+        <PiCursorClick className="explainer-empty-icon" />
+        <p>Pick a file to see what it does, what it depends on, and what to improve.</p>
       </div>
     );
   }
 
   return (
-    <div className="explainer-panel">
-      <div className="explainer-panel-header">
-        <HiOutlineDocument />
-        <span className="explainer-path">{path}</span>
+    <div className="explainer" aria-live="polite" aria-busy={loading}>
+      <div className="explainer-head">
+        <PiFileCode />
+        <span className="mono explainer-path">{path}</span>
+        {explanation && !loading && (
+          <span className={`sev-tag ${COMPLEXITY_CLASS[explanation.complexity] || "sev-low"}`}>
+            {explanation.complexity} complexity
+          </span>
+        )}
       </div>
 
-      <AnimatePresence mode="wait">
-        {loading ? (
-          <motion.div
-            key="loading"
-            className="explainer-loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <span className="explainer-spinner" />
-            Explaining this file…
-          </motion.div>
-        ) : error ? (
-          <motion.p key="error" className="explainer-error" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            {error}
-          </motion.p>
-        ) : explanation ? (
-          <motion.div
-            key="content"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="explainer-content"
-          >
-            <div className={`explainer-complexity accent-${complexityAccent(explanation.complexity)}`}>
-              <HiOutlineChartBar /> Complexity: {explanation.complexity}
-            </div>
-
-            <ExplainerBlock icon={<HiOutlineLightBulb />} title="Purpose" text={explanation.purpose} />
-            <ExplainerBlock icon={<HiOutlineCog6Tooth />} title="Logic" text={explanation.logic} />
-            <ExplainerBlock icon={<HiOutlineArrowPath />} title="Flow" text={explanation.flow} />
-
-            <div className="explainer-block">
-              <div className="explainer-block-title">
-                <HiOutlineWrenchScrewdriver /> Possible improvements
-              </div>
-              <ul>
-                {(explanation.improvements || []).map((item, i) => (
+      {loading ? (
+        <div className="explainer-body" aria-label="Loading explanation">
+          {[70, 95, 60, 85, 40].map((w, i) => (
+            <div key={i} className="skeleton explainer-skel" style={{ width: `${w}%` }} />
+          ))}
+        </div>
+      ) : error ? (
+        <p className="explainer-error" role="alert">
+          {error}
+        </p>
+      ) : explanation ? (
+        <div className="explainer-body">
+          <Block title="Purpose" text={explanation.purpose} />
+          <Block title="Logic" text={explanation.logic} />
+          <Block title="Flow" text={explanation.flow} />
+          <section className="explainer-block">
+            <h4>Improvements</h4>
+            {(explanation.improvements || []).length > 0 ? (
+              <ul className="explainer-list">
+                {explanation.improvements.map((item, i) => (
                   <li key={i}>{item}</li>
                 ))}
               </ul>
-            </div>
-
-            {explanation.source === "heuristic" && (
-              <p className="explainer-note">
-                Heuristic explanation — set <code>GROQ_API_KEY</code> on the backend for a full AI explanation.
-              </p>
+            ) : (
+              <p className="empty-note">None suggested.</p>
             )}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+          </section>
+          {explanation.source === "heuristic" && (
+            <p className="explainer-note">Based on static parsing. AI explanations aren't enabled on this server.</p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function ExplainerBlock({ icon, title, text }) {
+function Block({ title, text }) {
   return (
-    <div className="explainer-block">
-      <div className="explainer-block-title">
-        {icon} {title}
-      </div>
+    <section className="explainer-block">
+      <h4>{title}</h4>
       <p>{text}</p>
-    </div>
+    </section>
   );
 }

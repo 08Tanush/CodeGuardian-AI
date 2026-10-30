@@ -7,6 +7,7 @@ surprising way - it's pure helpers only.
 
 import re
 import uuid
+from urllib.parse import urlparse
 
 
 def new_id() -> str:
@@ -57,10 +58,14 @@ def normalize_github_url(url: str) -> str:
         url = f"https://github.com/{path}"
     if not url.startswith("http"):
         url = f"https://{url}"
-    url = url.rstrip("/")
-    if not url.endswith(".git"):
-        url = f"{url}.git"
-    return url
+    # Keep only owner/repo, so links copied from a file view or branch page
+    # (".../tree/main/src", ".../blob/main/x.py", "?tab=readme") still clone.
+    parsed = urlparse(url)
+    parts = [p for p in parsed.path.split("/") if p][:2]
+    if len(parts) < 2:
+        return url.rstrip("/")
+    owner, repo = parts[0], parts[1].removesuffix(".git")
+    return f"https://github.com/{owner}/{repo}.git"
 
 
 def extract_repo_name(url: str) -> str:

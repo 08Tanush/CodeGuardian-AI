@@ -92,11 +92,12 @@ export function computeForceLayout(nodes, edges, { width = 800, height = 520, it
   return result;
 }
 
-const PALETTE = ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b", "#ef4444", "#06b6d4", "#ec4899", "#84cc16"];
-
+// Folder colors use the validated categorical slots in fixed order; the
+// ninth folder onward folds into the neutral "other" color.
 export function colorForFolder(folder, folderIndexMap) {
   if (!folderIndexMap.has(folder)) {
     folderIndexMap.set(folder, folderIndexMap.size);
   }
-  return PALETTE[folderIndexMap.get(folder) % PALETTE.length];
+  const idx = folderIndexMap.get(folder);
+  return idx < 8 ? `var(--series-${idx + 1})` : "var(--series-other)";
 }

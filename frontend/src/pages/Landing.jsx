@@ -1,167 +1,251 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  HiOutlineCpuChip,
-  HiOutlineShieldExclamation,
-  HiOutlineBoltSlash,
-  HiOutlineDocumentText,
-  HiOutlineSparkles,
-  HiOutlineCubeTransparent,
-  HiArrowRight,
-  HiOutlineCloudArrowUp,
-} from "react-icons/hi2";
+  PiArrowRight,
+  PiShieldWarning,
+  PiGauge,
+  PiGraph,
+  PiBroom,
+  PiBookOpenText,
+  PiFileMagnifyingGlass,
+  PiUploadSimple,
+  PiScan,
+  PiListChecks,
+  PiLockKey,
+} from "react-icons/pi";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import FeatureCard from "../components/FeatureCard";
+import ScoreGauge from "../components/ScoreGauge";
+import SeverityTag from "../components/SeverityTag";
+import LanguageBar from "../components/LanguageBar";
+import DependencyGraph from "../components/DependencyGraph";
+import useRobotsMeta from "../hooks/useRobotsMeta";
 import "./Landing.css";
 
-const FEATURES = [
-  {
-    icon: <HiOutlineCubeTransparent />,
-    title: "Architecture overview",
-    description: "See how your repository is structured, how modules connect, and where complexity concentrates.",
-    accent: "primary",
-  },
-  {
-    icon: <HiOutlineShieldExclamation />,
-    title: "Security analysis",
-    description: "Surface hard-coded secrets, unsafe patterns, and other risks before they reach production.",
-    accent: "danger",
-  },
-  {
-    icon: <HiOutlineBoltSlash />,
-    title: "Visual dependency map",
-    description: "An interactive graph of how your files import and depend on each other, generated automatically.",
-    accent: "warning",
-  },
-  {
-    icon: <HiOutlineDocumentText />,
-    title: "Documentation analysis",
-    description: "Find out where your README, comments, and docs fall short of what new contributors need.",
-    accent: "secondary",
-  },
-  {
-    icon: <HiOutlineCpuChip />,
-    title: "Code quality scoring",
-    description: "Get a maintainability score built from real findings, not a black-box number.",
-    accent: "success",
-  },
-  {
-    icon: <HiOutlineSparkles />,
-    title: "AI suggestions",
-    description: "Click any file to get an instant AI explanation of its purpose, logic, and possible improvements.",
-    accent: "primary",
-  },
+// Example data for the product preview. Rendered with the same components
+// the real dashboard uses, and labeled as an example.
+const SAMPLE_FINDINGS = [
+  { severity: "high", description: "Possible hard-coded credential or secret.", file: "config/settings.py" },
+  { severity: "medium", description: "subprocess call with shell=True.", file: "scripts/deploy.py" },
+  { severity: "low", description: "Uses print() instead of logging.", file: "ledger/cli.py" },
 ];
+const SAMPLE_LANGS = { Python: 41, SQL: 9, Markdown: 6, YAML: 3 };
+const SAMPLE_GRAPH = {
+  nodes: [
+    { id: "ledger/api.py", label: "api.py", folder: "ledger" },
+    { id: "ledger/models.py", label: "models.py", folder: "ledger" },
+    { id: "ledger/db.py", label: "db.py", folder: "ledger" },
+    { id: "ledger/cli.py", label: "cli.py", folder: "ledger" },
+    { id: "config/settings.py", label: "settings.py", folder: "config" },
+    { id: "tests/test_api.py", label: "test_api.py", folder: "tests" },
+  ],
+  edges: [
+    { source: "ledger/api.py", target: "ledger/models.py" },
+    { source: "ledger/models.py", target: "ledger/db.py" },
+    { source: "ledger/db.py", target: "config/settings.py" },
+    { source: "ledger/cli.py", target: "ledger/api.py" },
+    { source: "tests/test_api.py", target: "ledger/api.py" },
+    { source: "ledger/api.py", target: "config/settings.py" },
+  ],
+  cycles: [],
+};
+
+const SECURITY_RULES = [
+  "Hard-coded secrets, AWS keys, private keys",
+  "SQL built with string formatting",
+  "TLS verification turned off",
+  "eval / exec, shell=True, unsafe pickle and YAML",
+  "innerHTML and document.write",
+];
+const QUALITY_RULES = ["Files over 400 lines", "Functions over 80 lines", "Deep nesting", "Bare except", "Leftover debug output", "TODO and FIXME"];
+
+const rise = {
+  hidden: { opacity: 0, y: 14 },
+  show: (i = 0) => ({ opacity: 1, y: 0, transition: { duration: 0.6, delay: i * 0.07, ease: [0.16, 1, 0.3, 1] } }),
+};
+
+function Reveal({ children, className, i = 0 }) {
+  return (
+    <motion.div className={className} variants={rise} custom={i} initial="hidden" whileInView="show" viewport={{ once: true, amount: 0.25 }}>
+      {children}
+    </motion.div>
+  );
+}
 
 export default function Landing() {
+  useRobotsMeta(false);
+
   return (
     <>
       <Navbar />
-      <main className="page landing">
-        <section className="hero">
-          <div className="hero-bg" aria-hidden="true">
-            <span className="hero-blob blob-a" />
-            <span className="hero-blob blob-b" />
-            <span className="hero-grid" />
-          </div>
-
-          <div className="container hero-inner">
-            <motion.span
-              className="hero-eyebrow"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <HiOutlineSparkles /> AI-powered engineering intelligence
-            </motion.span>
-
-            <motion.h1
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.08 }}
-            >
-              Point CodeGuardian at your repo.
-              <br />
-              Get a <span className="gradient-text">senior engineer's review</span> in minutes.
+      <main id="main" className="page landing">
+        <section className="hero container">
+          <div className="hero-copy">
+            <motion.h1 variants={rise} custom={0} initial="hidden" animate="show">
+              A senior-level code review of any repository.
             </motion.h1>
-
-            <motion.p
-              className="hero-subtitle"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.16 }}
-            >
-              Upload a ZIP or paste a public GitHub URL. CodeGuardian runs a fast static analysis
-              engine across every file, then uses AI to turn the findings into a polished
-              engineering report — architecture, security, documentation, and a maintainability
-              score, plus an interactive dependency map.
+            <motion.p className="hero-sub" variants={rise} custom={1} initial="hidden" animate="show">
+              Upload a ZIP or paste a GitHub URL. Get security findings, a maintainability score, and a dependency map.
             </motion.p>
-
-            <motion.div
-              className="hero-actions"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.24 }}
-            >
-              <Link to="/upload" className="btn btn-primary hero-cta">
-                <HiOutlineCloudArrowUp /> Analyze a repository <HiArrowRight />
+            <motion.div className="hero-actions" variants={rise} custom={2} initial="hidden" animate="show">
+              <Link to="/upload" className="btn btn-primary btn-lg">
+                Analyze a repo <PiArrowRight />
               </Link>
-              <a href="#features" className="btn btn-ghost">
+              <a href="#checks" className="btn btn-secondary btn-lg">
                 See what it checks
               </a>
             </motion.div>
-
-            <motion.div
-              className="hero-stats"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.32 }}
-            >
-              <div>
-                <strong>8</strong>
-                <span>Report sections</span>
-              </div>
-              <div className="hero-stats-divider" />
-              <div>
-                <strong>ZIP or URL</strong>
-                <span>Two ways to start</span>
-              </div>
-              <div className="hero-stats-divider" />
-              <div>
-                <strong>.md</strong>
-                <span>Exportable report</span>
-              </div>
-            </motion.div>
           </div>
-        </section>
 
-        <section className="features" id="features">
-          <div className="container">
-            <div className="section-heading">
-              <span className="section-eyebrow">What CodeGuardian checks</span>
-              <h2>Every angle a senior reviewer would look at</h2>
-              <p>Six analysis dimensions, distilled into one report you can share, download, or dig into file by file.</p>
+          <motion.figure className="preview panel" variants={rise} custom={2} initial="hidden" animate="show">
+            <figcaption className="preview-head">
+              <span className="mono">ledger-api</span>
+              <span className="preview-label">Example report</span>
+            </figcaption>
+            <div className="preview-top">
+              <ScoreGauge score={68} size={150} />
+              <div className="preview-stats">
+                <dl>
+                  <div>
+                    <dt>Files</dt>
+                    <dd className="mono">59</dd>
+                  </div>
+                  <div>
+                    <dt>Lines</dt>
+                    <dd className="mono">7,412</dd>
+                  </div>
+                  <div>
+                    <dt>Findings</dt>
+                    <dd className="mono">11</dd>
+                  </div>
+                </dl>
+                <LanguageBar breakdown={SAMPLE_LANGS} />
+              </div>
             </div>
-
-            <div className="features-grid">
-              {FEATURES.map((f, i) => (
-                <FeatureCard key={f.title} {...f} index={i} />
+            <ul className="preview-findings">
+              {SAMPLE_FINDINGS.map((f) => (
+                <li key={f.file}>
+                  <SeverityTag severity={f.severity} />
+                  <div>
+                    <p>{f.description}</p>
+                    <p className="mono preview-file">{f.file}</p>
+                  </div>
+                </li>
               ))}
-            </div>
+            </ul>
+          </motion.figure>
+        </section>
+
+        <section id="checks" className="checks container">
+          <Reveal>
+            <h2 className="section-title">What it checks</h2>
+          </Reveal>
+
+          <div className="bento">
+            <Reveal className="cell cell-security" i={0}>
+              <PiShieldWarning className="cell-icon" />
+              <h3>Security</h3>
+              <p>Pattern checks across every file for the mistakes that become incidents.</p>
+              <ul className="rule-list mono">
+                {SECURITY_RULES.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </Reveal>
+
+            <Reveal className="cell cell-score" i={1}>
+              <PiGauge className="cell-icon" />
+              <h3>A score you can audit</h3>
+              <p>No black box. Every point comes from a finding you can see.</p>
+              <code className="formula">
+                100 - 12 x high
+                <br />
+                {"    "}- 5 x medium
+                <br />
+                {"    "}- 1.5 x low
+              </code>
+            </Reveal>
+
+            <Reveal className="cell cell-graph" i={0}>
+              <div className="cell-text">
+                <PiGraph className="cell-icon" />
+                <h3>Dependency map</h3>
+                <p>See which files import which, and spot circular imports. Click a file to open its explanation.</p>
+              </div>
+              <DependencyGraph graph={SAMPLE_GRAPH} height={300} />
+            </Reveal>
+
+            <Reveal className="cell cell-quality" i={1}>
+              <PiBroom className="cell-icon" />
+              <h3>Code quality</h3>
+              <p>Structural signals that make code harder to change.</p>
+              <ul className="chip-list">
+                {QUALITY_RULES.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </Reveal>
+
+            <Reveal className="cell cell-docs" i={0}>
+              <PiBookOpenText className="cell-icon" />
+              <h3>Documentation</h3>
+              <p>Missing READMEs and undocumented functions, judged against the kind of project it is.</p>
+            </Reveal>
+
+            <Reveal className="cell cell-explain" i={1}>
+              <PiFileMagnifyingGlass className="cell-icon" />
+              <h3>File explainer</h3>
+              <p>Open any file for a plain-language summary of its purpose, logic, and flow, plus specific improvements.</p>
+              <blockquote className="explain-sample">
+                <span className="mono">ledger/db.py</span>
+                Opens the database connection and exposes the session used by every model. Reads credentials from
+                settings.py.
+              </blockquote>
+            </Reveal>
           </div>
         </section>
 
-        <section className="cta-band">
-          <div className="container cta-band-inner">
-            <div>
-              <h2>Ready to see your codebase through CodeGuardian's eyes?</h2>
-              <p>No account, no setup — just drop in a repository and get a report.</p>
-            </div>
-            <Link to="/upload" className="btn btn-primary">
-              Get started <HiArrowRight />
+        <section className="how container">
+          <Reveal>
+            <h2 className="section-title">How it works</h2>
+          </Reveal>
+          <ol className="steps">
+            {[
+              { icon: PiUploadSimple, title: "Upload", text: "Drop a ZIP up to 50 MB, or paste the URL of a public GitHub repository." },
+              { icon: PiScan, title: "Scan", text: "A static analysis engine reads every supported file and records each finding." },
+              { icon: PiListChecks, title: "Review", text: "Read the dashboard, filter findings, and download the report as PDF or Markdown." },
+            ].map((s, i) => (
+              <motion.li
+                key={s.title}
+                className="step"
+                variants={rise}
+                custom={i}
+                initial="hidden"
+                whileInView="show"
+                viewport={{ once: true, amount: 0.25 }}
+              >
+                <s.icon className="step-icon" />
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+              </motion.li>
+            ))}
+          </ol>
+          <Reveal className="privacy">
+            <PiLockKey className="privacy-icon" />
+            <p>
+              Whole-repo analysis never sends your source code to an AI model; at most a short summary of findings is
+              sent to write the report prose. The file explainer sends only the file you open.
+            </p>
+          </Reveal>
+        </section>
+
+        <section className="container">
+          <Reveal className="closing">
+            <h2>Find out what's in your repository.</h2>
+            <Link to="/upload" className="btn btn-primary btn-lg">
+              Analyze a repo <PiArrowRight />
             </Link>
-          </div>
+          </Reveal>
         </section>
       </main>
       <Footer />

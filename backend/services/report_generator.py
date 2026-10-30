@@ -21,7 +21,7 @@ def _issue_lines(issues: list[dict], category: str) -> str:
     for issue in filtered:
         severity = issue.get("severity", "low").upper()
         file_ref = issue.get("file", "/")
-        lines.append(f"- **[{severity}]** `{file_ref}` — {issue.get('description', '')}")
+        lines.append(f"- **[{severity}]** `{file_ref}` - {issue.get('description', '')}")
     return "\n".join(lines) + "\n"
 
 
@@ -29,7 +29,7 @@ def build_markdown_report(analysis: dict) -> str:
     repo = analysis["repository"]
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
-    md = f"""# CodeGuardian AI — Engineering Report
+    md = f"""# CodeGuardian AI - Engineering Report
 
 **Repository:** {repo['name']}
 **Generated:** {generated_at}
@@ -89,7 +89,7 @@ def build_markdown_report(analysis: dict) -> str:
 
 ---
 
-## AI Suggestions
+## Suggestions
 
 {_bullet_list(analysis['ai_suggestions'])}
 

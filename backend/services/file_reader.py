@@ -20,9 +20,16 @@ IGNORED_FOLDERS = {
     "bin", "obj", ".gradle", ".terraform", "site-packages",
 }
 
-# File extensions CodeGuardian knows how to reason about.
+# File extensions CodeGuardian knows how to reason about. Covers common
+# application/source languages plus a few doc/config formats needed for
+# the file tree and framework detection - see analyzer.py's
+# NON_PRIMARY_LANGUAGES for which of these are excluded from competing
+# for "primary language" (docs/config shouldn't out-vote real source code).
 SUPPORTED_EXTENSIONS = {
-    ".py", ".js", ".jsx", ".ts", ".tsx",
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs", ".vue",
+    ".java", ".c", ".cpp", ".cc", ".cxx", ".h", ".hpp", ".cs",
+    ".go", ".php", ".rb", ".kt", ".kts", ".swift", ".dart", ".rs",
+    ".sql", ".scss", ".sass", ".less",
     ".html", ".css", ".json", ".md",
 }
 
@@ -38,22 +45,30 @@ def should_ignore_dir(dirname: str) -> bool:
     return dirname in IGNORED_FOLDERS or dirname.startswith(".")
 
 
-def walk_repository(root: Path) -> list[Path]:
+def walk_repository(root: Path) -> tuple[list[Path], int]:
     """
-    Return every supported file under root, skipping ignored folders.
-    Uses os.walk with in-place dirname pruning so ignored trees (like a
-    huge node_modules) are never descended into at all, rather than being
-    walked and filtered out afterward - this matters a lot on large repos.
+    Return every supported file under root, skipping ignored folders, plus
+    a count of files seen at the same directory levels that were skipped
+    purely for having an unsupported extension. Uses os.walk with in-place
+    dirname pruning so ignored trees (like a huge node_modules) are never
+    descended into at all - both the supported-file collection and the
+    unsupported-extension count only cover files CodeGuardian actually
+    looked at, not files inside pruned directories. That's a deliberate
+    scope boundary: counting inside node_modules/.git/etc. would mean
+    descending into them, defeating the entire point of pruning them.
     """
     collected: list[Path] = []
+    unsupported_extension_count = 0
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if not should_ignore_dir(d)]
         for filename in filenames:
             if Path(filename).suffix.lower() in SUPPORTED_EXTENSIONS:
                 collected.append(Path(dirpath) / filename)
                 if len(collected) >= MAX_TOTAL_FILES:
-                    return collected
-    return collected
+                    return collected, unsupported_extension_count
+            else:
+                unsupported_extension_count += 1
+    return collected, unsupported_extension_count
 
 
 def read_file_safe(path: Path) -> str | None:

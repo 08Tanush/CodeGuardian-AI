@@ -23,6 +23,7 @@ from services.path_utils import normalize_path
 from services import file_reader, heuristics
 from services.dependency_graph import build_dependency_graph
 from services.groq_client import GroqUnavailableError, summarize_repository
+from services.repo_profile import detect_repository_type
 from services.utils import format_bytes
 
 logger = logging.getLogger("codeguardian.analyzer")
@@ -30,8 +31,22 @@ logger = logging.getLogger("codeguardian.analyzer")
 LANGUAGE_BY_EXT = {
     ".py": "Python", ".js": "JavaScript", ".jsx": "JavaScript (React)",
     ".ts": "TypeScript", ".tsx": "TypeScript (React)",
+    ".mjs": "JavaScript", ".cjs": "JavaScript", ".vue": "Vue",
+    ".java": "Java", ".c": "C", ".cpp": "C++", ".cc": "C++", ".cxx": "C++",
+    ".h": "C/C++ Header", ".hpp": "C/C++ Header", ".cs": "C#",
+    ".go": "Go", ".php": "PHP", ".rb": "Ruby", ".kt": "Kotlin", ".kts": "Kotlin",
+    ".swift": "Swift", ".dart": "Dart", ".rs": "Rust", ".sql": "SQL",
+    ".scss": "SCSS", ".sass": "Sass", ".less": "Less",
     ".html": "HTML", ".css": "CSS", ".json": "JSON", ".md": "Markdown",
 }
+
+# Documentation and config formats are tracked in the language breakdown
+# for information, but never allowed to win "primary language" - a repo
+# that's 95% Java and 5% Markdown should report Java, not Markdown, even
+# though a lone README used to be the only file CodeGuardian could even
+# see in unsupported-extension repos (that was the actual root cause; see
+# SUPPORTED_EXTENSIONS in file_reader.py).
+NON_PRIMARY_LANGUAGES = {"Markdown", "JSON", "C/C++ Header"}
 
 FRAMEWORK_SIGNALS = {
     "React": ["\"react\"", "'react'", "react-dom"],
@@ -42,6 +57,10 @@ FRAMEWORK_SIGNALS = {
     "FastAPI": ["fastapi"],
     "Django": ["django"],
     "Flask": ["flask"],
+    "Spring Boot": ["spring-boot", "springframework.boot"],
+    ".NET": ["microsoft.net.sdk", "microsoft.aspnetcore"],
+    "Laravel": ["laravel/framework"],
+    "Ruby on Rails": ["rails"],
 }
 
 # Structural signals: presence of a specific file is often a stronger,
@@ -66,6 +85,16 @@ FRAMEWORK_FILE_SIGNALS = {
 # with many medium-sized files still ballooning memory usage.
 MAX_TOTAL_CONTENT_BYTES = 30_000_000  # 30 MB
 
+# Lock files are auto-generated, not human-written application code - they
+# shouldn't influence language detection, get scanned for code-quality
+# patterns (a huge minified lock file tripping a "file too long" check is
+# meaningless noise), or count as "source" in any way.
+LOCK_FILE_NAMES = {
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
+    "poetry.lock", "Pipfile.lock", "Cargo.lock",
+    "Gemfile.lock", "composer.lock",
+}
+
 
 def _detect_language_breakdown(files: list[Path]) -> dict[str, int]:
     breakdown: dict[str, int] = {}
@@ -79,7 +108,11 @@ def _detect_language_breakdown(files: list[Path]) -> dict[str, int]:
 def _detect_framework(root: Path, files: list[Path]) -> str:
     detected: set[str] = set()
 
-    manifest_names = ["package.json", "requirements.txt", "pyproject.toml", "Pipfile"]
+    manifest_names = [
+        "package.json", "requirements.txt", "pyproject.toml", "Pipfile",
+        "pom.xml", "build.gradle", "build.gradle.kts",
+        "Cargo.toml", "composer.json", "Gemfile", "go.mod",
+    ]
     haystack = ""
     for name in manifest_names:
         manifest = root / name
@@ -116,19 +149,49 @@ def _detect_framework(root: Path, files: list[Path]) -> str:
 def _top_language(breakdown: dict[str, int]) -> str:
     if not breakdown:
         return "an unknown language"
+    real_languages = {k: v for k, v in breakdown.items() if k not in NON_PRIMARY_LANGUAGES}
+    if real_languages:
+        return max(real_languages, key=real_languages.get)
+    # The repo genuinely only has docs/config files (e.g. a README-only
+    # placeholder repo) - fall back to whatever's there rather than lying.
     return max(breakdown, key=breakdown.get)
 
 
+def _loc_weighted_primary_language(files_with_content: list[tuple[str, str]]) -> str:
+    """
+    File-count alone can pick the wrong primary language - e.g. a repo with
+    30 small README/docs.md files and 8 large TypeScript files should
+    report TypeScript, not Markdown, even before NON_PRIMARY_LANGUAGES
+    exclusion kicks in; and between two real source languages, the one
+    with more actual lines of code (not just more files) is the better
+    signal of what a repo "is". This mirrors _top_language's exclusion of
+    docs/config languages but weighs by LOC instead of file count.
+    """
+    loc_by_language: dict[str, int] = {}
+    for path, content in files_with_content:
+        ext = "." + path.rsplit(".", 1)[-1].lower() if "." in path else ""
+        lang = LANGUAGE_BY_EXT.get(ext)
+        if not lang:
+            continue
+        loc_by_language[lang] = loc_by_language.get(lang, 0) + file_reader.count_lines(content)
+    return _top_language(loc_by_language)
+
+
 def _gather_repo_stats(root: Path) -> dict:
-    files = file_reader.walk_repository(root)
+    files, unsupported_extension_count = file_reader.walk_repository(root)
     total_size = sum((root / f).stat().st_size for f in files if f.exists())
 
     files_with_content: list[tuple[str, str]] = []
     total_lines = 0
     content_budget_used = 0
     truncated_for_size = 0
+    unreadable_count = 0
+    lock_file_count = 0
 
     for path in files:
+        if path.name in LOCK_FILE_NAMES:
+            lock_file_count += 1
+            continue
         if content_budget_used >= MAX_TOTAL_CONTENT_BYTES:
             # Still counted toward file_count/tree/language stats above,
             # just not read into memory for pattern analysis - protects
@@ -137,6 +200,7 @@ def _gather_repo_stats(root: Path) -> dict:
             continue
         content = file_reader.read_file_safe(path)
         if content is None:
+            unreadable_count += 1
             continue
         rel = normalize_path(str(path.relative_to(root)))
         files_with_content.append((rel, content))
@@ -147,6 +211,10 @@ def _gather_repo_stats(root: Path) -> dict:
         logger.info("Skipped reading %d file(s) after hitting the %d MB content cap.",
                     truncated_for_size, MAX_TOTAL_CONTENT_BYTES // 1_000_000)
 
+    files_discovered = len(files) + unsupported_extension_count
+    files_analyzed = len(files_with_content)
+    files_skipped = files_discovered - files_analyzed
+
     return {
         "files": files,
         "files_with_content": files_with_content,
@@ -156,6 +224,17 @@ def _gather_repo_stats(root: Path) -> dict:
         "language_breakdown": _detect_language_breakdown(files),
         "framework": _detect_framework(root, files),
         "truncated_for_size": truncated_for_size,
+        "discovery_stats": {
+            "files_discovered": files_discovered,
+            "files_analyzed": files_analyzed,
+            "files_skipped": files_skipped,
+            "skip_reasons": {
+                "unsupported_extension": unsupported_extension_count,
+                "unreadable_or_binary": unreadable_count,
+                "size_limit": truncated_for_size,
+                "lock_file": lock_file_count,
+            },
+        },
     }
 
 
@@ -179,13 +258,14 @@ def _build_digest(repo_meta: dict, issues: list[dict], strengths: list[str], dep
 
     lines = [
         f"# Repository: {repo_meta['name']}",
+        f"Type: {repo_meta['repository_type'].replace('_', ' ')} | "
         f"Files analyzed: {repo_meta['file_count']} | Lines: {repo_meta['total_lines']} | "
         f"Size: {repo_meta['total_size_display']} | Primary language: {repo_meta['primary_language']} | "
         f"Framework: {repo_meta['framework']}",
         "",
         f"## Findings ({len(issues)} total: {by_severity['high']} high, "
         f"{by_severity['medium']} medium, {by_severity['low']} low)",
-        f"By category: " + ", ".join(f"{k}={v}" for k, v in by_category.items()) or "None",
+        "By category: " + (", ".join(f"{k}={v}" for k, v in by_category.items()) or "None"),
         "",
         "## Top findings",
     ]
@@ -216,27 +296,60 @@ def _heuristic_prose(repo_meta: dict, issues: list[dict], strengths: list[str], 
     per-field fallback when an AI response is missing a key."""
     high = sum(1 for i in issues if i["severity"] == "high")
     security_count = sum(1 for i in issues if i["category"] == "security")
+    quality_count = sum(1 for i in issues if i["category"] == "quality")
+    doc_count = sum(1 for i in issues if i["category"] == "documentation")
+
+    repo_type = repo_meta["repository_type"]
+    type_label = repo_type.replace("_", " ").replace("cli ", "CLI ").replace("ml ", "ML ")
+    if repo_type == "unknown":
+        what = f"{repo_meta['name']} is written mostly in {repo_meta['primary_language']}"
+    else:
+        article = "an" if type_label[0] in "aeiou" or type_label.startswith("ML") else "a"
+        what = f"{repo_meta['name']} is {article} {type_label} written mostly in {repo_meta['primary_language']}"
+
+    # Unique descriptions, worst first, each with how many files it hits -
+    # "fix X (12 files)" is a roadmap item; the same line twelve times is not.
+    ordered = sorted(issues, key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x.get("severity"), 3))
+    hits: dict[str, int] = {}
+    for issue in ordered:
+        hits[issue["description"]] = hits.get(issue["description"], 0) + 1
+    roadmap = [
+        f"{desc.rstrip('.')} ({n} files)." if n > 1 else desc
+        for desc, n in list(hits.items())[:5]
+    ]
+
+    suggestions: list[str] = []
+    if high:
+        suggestions.append(f"Fix the {high} high-severity finding(s) first; most are secrets or injection risks.")
+    if any("credential" in i["description"] or "AWS" in i["description"] for i in issues):
+        suggestions.append("Move hard-coded credentials into environment variables or a secrets manager, then rotate them.")
+    if any(i["description"] == "No test files were detected." for i in issues):
+        suggestions.append("Add a test suite, starting with the modules that have the most findings.")
+    if not has_readme:
+        suggestions.append("Add a README covering setup, usage, and project structure.")
+    if quality_count >= 5:
+        suggestions.append("Add a linter and formatter to CI so quality findings stop accumulating.")
+    if doc_count and has_readme:
+        suggestions.append("Document public functions; several files are missing docstrings.")
+    if not suggestions:
+        suggestions.append("No urgent changes. Keep tests and docs current as the code grows.")
 
     return {
         "summary": (
-            f"{repo_meta['name']} contains {repo_meta['file_count']} analyzed files "
-            f"({repo_meta['total_size_display']}) written mostly in {repo_meta['primary_language']}. "
+            f"{what} ({repo_meta['file_count']} analyzed files, {repo_meta['total_size_display']}). "
             f"Static analysis found {len(issues)} finding(s) across security, quality, and documentation."
         ),
         "architecture_overview": (
-            f"Framework detection found: {repo_meta['framework']}. See the architecture map below for "
-            "how files import one another, built automatically from static analysis."
+            (f"Repository type: {type_label}. " if repo_type != "unknown" else "The repository type couldn't be determined. ")
+            + f"Framework detection found: {repo_meta['framework']}. "
+            "The architecture map shows how files import one another, built automatically "
+            "from static analysis."
         ),
-        "code_quality_note": f"Found {sum(1 for i in issues if i['category'] == 'quality')} code quality finding(s) via static analysis.",
+        "code_quality_note": f"Found {quality_count} code quality finding(s) via static analysis.",
         "security_note": f"{security_count} security finding(s), {high} of them high-severity.",
         "documentation_note": "README present." if has_readme else "No README detected at the repo root.",
-        "ai_suggestions": [
-            "Set GROQ_API_KEY on the backend to unlock AI-polished summaries and suggestions.",
-            "Resolve high-severity findings first (see the Security section).",
-        ] if not strengths else strengths[:3],
-        "improvement_roadmap": [i["description"] for i in sorted(
-            issues, key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x.get("severity"), 3)
-        )[:5]] or ["No specific issues found - nice work."],
+        "ai_suggestions": suggestions[:5],
+        "improvement_roadmap": roadmap or ["No specific issues found - nice work."],
     }
 
 
@@ -248,6 +361,12 @@ def analyze_repository(root: Path, name: str) -> dict:
     to be JSON-serialized and sent to the frontend / saved as a report.
     """
     stats = _gather_repo_stats(root)
+
+    repo_type_result = detect_repository_type(
+        root, stats["files"], stats["framework"], stats["language_breakdown"],
+        stats["files_with_content"], file_reader.read_file_safe,
+    )
+
     repo_meta = {
         "name": name,
         "file_count": stats["file_count"],
@@ -255,11 +374,23 @@ def analyze_repository(root: Path, name: str) -> dict:
         "total_size": stats["total_size"],
         "total_size_display": format_bytes(stats["total_size"]),
         "language_breakdown": stats["language_breakdown"],
-        "primary_language": _top_language(stats["language_breakdown"]),
+        "primary_language": _loc_weighted_primary_language(stats["files_with_content"]),
         "framework": stats["framework"],
+        "repository_type": repo_type_result["type"],
+        "repository_type_evidence": repo_type_result["evidence"],
     }
 
     issues, strengths = heuristics.analyze_repository_files(stats["files_with_content"])
+
+    # Repository-type-aware false-positive suppression: a documentation
+    # repository has no reason to run application test suites, so "no
+    # test files" isn't a real finding there - see brief Section 10/24
+    # ("do not penalize absence of irrelevant features"). Every other
+    # repository type still gets this check; tests are broadly relevant
+    # everywhere except a pure docs repo.
+    if repo_meta["repository_type"] == "documentation":
+        issues = [i for i in issues if i.get("description") != "No test files were detected."]
+
     maintainability_score = heuristics.compute_maintainability_score(issues)
 
     issue_distribution: dict[str, int] = {}
@@ -300,5 +431,6 @@ def analyze_repository(root: Path, name: str) -> dict:
         "issue_distribution": issue_distribution,
         "file_tree": file_tree,
         "dependency_graph": dependency_graph,
+        "discovery_stats": stats["discovery_stats"],
         "analysis_mode": mode,
     }

@@ -58,6 +58,38 @@ GROUNDING_RULES = (
     "Your job is explanation and prioritization, not invention."
 )
 
+# Groq's own docs and community bug reports confirm gpt-oss-20b
+# intermittently fails plain `{"type": "json_object"}` requests with a
+# 400 "json_validate_failed" error (reported ~10% of requests, even on
+# Groq's own example code). Their documented mitigation is strict JSON
+# Schema mode, which uses constrained decoding to guarantee the output
+# matches the schema shape rather than just "is valid JSON, some shape".
+# Our Pydantic models are flat (str / list[str] only, no nested models),
+# so building a compliant strict schema is straightforward: mark every
+# property required and disallow extras, which is what "strict" mode
+# requires.
+def _strict_json_schema(model: type[BaseModel]) -> dict:
+    schema = model.model_json_schema()
+    schema["additionalProperties"] = False
+    schema["required"] = list(schema.get("properties", {}).keys())
+    for prop in schema.get("properties", {}).values():
+        prop.pop("default", None)
+    return schema
+
+
+def _is_json_validate_failure(exc: Exception) -> bool:
+    """
+    Detects Groq's specific 400 "json_validate_failed" error by message
+    content rather than exception type, since the exact SDK exception
+    class isn't something we can verify without live access - a string
+    check is more robust to SDK version differences than relying on a
+    specific exception subclass existing.
+    """
+    text = str(exc).lower()
+    return "json_validate_failed" in text or (
+        "invalid_request_error" in text and "json" in text
+    )
+
 
 # ---------------------------------------------------------------------------
 # Exceptions
@@ -138,6 +170,26 @@ def ask_json(
     max_attempts = 2 if schema else 1
 
     for attempt in range(1, max_attempts + 1):
+        # Strict json_schema mode is tried first (Groq's documented fix for
+        # gpt-oss-20b's intermittent json_validate_failed errors). If that
+        # very request fails for any reason, the retry falls back to the
+        # plain json_object mode this app has already been running
+        # successfully, rather than repeating a request shape we can't
+        # verify against live Groq from this environment - this bounds the
+        # downside risk of the stricter mode to "no worse than before".
+        use_strict_schema = schema is not None and attempt == 1
+        if use_strict_schema:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__,
+                    "schema": _strict_json_schema(schema),
+                    "strict": True,
+                },
+            }
+        else:
+            response_format = {"type": "json_object"}
+
         try:
             response = client.chat.completions.create(
                 model=MODEL,
@@ -158,8 +210,7 @@ def ask_json(
                 # We don't need the model's internal reasoning returned.
                 include_reasoning=False,
 
-                # Require a JSON object from Groq.
-                response_format={"type": "json_object"},
+                response_format=response_format,
             )
 
             raw = response.choices[0].message.content
@@ -203,6 +254,21 @@ def ask_json(
             raise
 
         except Exception as exc:
+            # Groq's own docs and community reports confirm gpt-oss-20b
+            # intermittently returns a 400 json_validate_failed error even
+            # with a well-formed request - this used to go straight to
+            # GroqUnavailableError with no retry at all. Since it's a known
+            # transient failure (not a real error in our request), one
+            # retry (falling back to plain json_object mode, see above)
+            # meaningfully cuts the user-visible failure rate.
+            if _is_json_validate_failure(exc) and attempt < max_attempts:
+                logger.warning(
+                    "Groq json_validate_failed (attempt %d/%d), retrying "
+                    "with plain json_object mode: %s",
+                    attempt, max_attempts, exc,
+                )
+                continue
+
             # This logs the real API/network/auth/rate-limit error.
             logger.exception(
                 "Groq request failed: %s",
@@ -342,6 +408,14 @@ def summarize_repository(digest_markdown: str) -> dict:
         "analysis results. "
 
         f"{GROUNDING_RULES} "
+
+        "The digest states the repository's type (e.g. frontend application, "
+        "backend application, CLI tool, library, ML project, documentation). "
+        "Judge the repository against what's normal and relevant for THAT "
+        "type - for example, a frontend application having no backend/API "
+        "is expected, not a defect; a CLI tool having no web routes is "
+        "expected, not a defect. Only note an absence as a real concern if "
+        "it's genuinely expected for that repository type. "
 
         "Do not perform or claim additional analysis that is not supported "
         "by the digest. Do not invent filenames, vulnerabilities, "

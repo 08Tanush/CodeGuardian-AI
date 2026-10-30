@@ -1,104 +1,59 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import { HiShieldCheck, HiBars3, HiXMark } from "react-icons/hi2";
+import { useState } from "react";
+import { Link, NavLink } from "react-router-dom";
+import { PiShieldCheckFill, PiSun, PiMoon } from "react-icons/pi";
 import "./Navbar.css";
 
-export default function Navbar() {
-  const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-  const toggleRef = useRef(null);
+function currentTheme() {
+  const set = document.documentElement.getAttribute("data-theme");
+  if (set) return set;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+function ThemeToggle() {
+  const [theme, setTheme] = useState(currentTheme);
+  const next = theme === "dark" ? "light" : "dark";
 
-  useEffect(() => {
-    if (!menuOpen) return;
-
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") setMenuOpen(false);
-    };
-    const handleClickOutside = (e) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target) &&
-        toggleRef.current &&
-        !toggleRef.current.contains(e.target)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [menuOpen]);
-
-  const isActive = (path) => location.pathname === path;
+  const toggle = () => {
+    document.documentElement.setAttribute("data-theme", next);
+    try {
+      localStorage.setItem("cg-theme", next);
+    } catch {
+      // Storage can be blocked (private mode); the toggle still works for this visit.
+    }
+    setTheme(next);
+  };
 
   return (
+    <button className="btn btn-quiet theme-toggle" onClick={toggle} aria-label={`Switch to ${next} theme`}>
+      {theme === "dark" ? <PiSun /> : <PiMoon />}
+    </button>
+  );
+}
+
+export default function Navbar() {
+  return (
     <header className="navbar">
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <div className="container navbar-inner">
-        <Link to="/" className="navbar-brand">
-          <span className="navbar-brand-icon">
-            <HiShieldCheck />
-          </span>
+        <Link to="/" className="brand" aria-label="CodeGuardian AI home">
+          <PiShieldCheckFill className="brand-mark" />
           <span>
-            CodeGuardian <span className="gradient-text">AI</span>
+            CodeGuardian <span className="brand-ai">AI</span>
           </span>
         </Link>
 
         <nav className="navbar-links" aria-label="Primary">
-          <Link to="/" className={isActive("/") ? "active" : ""}>
+          <NavLink to="/" end className="navbar-link">
             Home
-          </Link>
-          <Link to="/upload" className={isActive("/upload") ? "active" : ""}>
+          </NavLink>
+          <ThemeToggle />
+          <Link to="/upload" className="btn btn-primary navbar-cta">
             Analyze a repo
           </Link>
         </nav>
-
-        <Link to="/upload" className="btn btn-primary navbar-cta">
-          Get started
-        </Link>
-
-        <button
-          ref={toggleRef}
-          className="navbar-menu-toggle"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          aria-expanded={menuOpen}
-          aria-controls="navbar-mobile-menu"
-        >
-          {menuOpen ? <HiXMark /> : <HiBars3 />}
-        </button>
       </div>
-
-      <AnimatePresence>
-        {menuOpen && (
-          <motion.nav
-            id="navbar-mobile-menu"
-            ref={menuRef}
-            className="navbar-mobile-menu"
-            aria-label="Mobile"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          >
-            <Link to="/" className={isActive("/") ? "active" : ""}>
-              Home
-            </Link>
-            <Link to="/upload" className={isActive("/upload") ? "active" : ""}>
-              Analyze a repo
-            </Link>
-          </motion.nav>
-        )}
-      </AnimatePresence>
     </header>
   );
 }
