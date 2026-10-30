@@ -10,4 +10,4 @@ Allow: /upload
 Disallow: /dashboard/
 Disallow: /report/
 
-Sitemap: /sitemap.xml
+Sitemap: https://code-guardian-ai-orpin.vercel.app/sitemap.xml

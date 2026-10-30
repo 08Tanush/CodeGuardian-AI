@@ -1,19 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Replace https://your-domain.vercel.app below with your actual deployed
-  domain once you know it (I don't have visibility into your final Vercel
-  URL from here). Only the two genuinely public pages are listed -
-  Dashboard and Report show private, per-user analysis results and are
-  intentionally excluded (see robots.txt) rather than listed here.
--->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://your-domain.vercel.app/</loc>
+    <loc>https://code-guardian-ai-orpin.vercel.app/</loc>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://your-domain.vercel.app/upload</loc>
+    <loc>https://code-guardian-ai-orpin.vercel.app/upload</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
